@@ -22,12 +22,15 @@ jobs:
       - name: Decode source project
         env:
           GH_TOKEN: ${{ github.token }}
+        shell: bash
         run: |
-          issue="${{ github.event.issue.number }}"
-          gh api "repos/${{ github.repository }}/issues/$issue" --jq -r .body > /tmp/payload.b64
-          gh api --paginate "repos/${{ github.repository }}/issues/$issue/comments?per_page=100" \
-            --jq '.[] | select(.body != "/import-expr-dsl") | .body' >> /tmp/payload.b64
-          tr -d '\r\n' < /tmp/payload.b64 | base64 --decode > /tmp/expr-dsl.zip
+          : > /tmp/payload.b64
+          for part in $(seq -w 0 9); do
+            gh api "repos/${{ github.repository }}/contents/.transport/part-$part?ref=agent/bootstrap-expr-dsl" --jq -r .content \
+              | tr -d '\r\n' | base64 --decode >> /tmp/payload.b64
+          done
+          base64 --decode /tmp/payload.b64 > /tmp/expr-dsl.zip
+          echo '183d1261c8427a24d92e067276699e86651e7a986efd0bc79249b1330f78e4d3  /tmp/expr-dsl.zip' | sha256sum -c -
           mkdir /tmp/expr-dsl
           unzip -q /tmp/expr-dsl.zip -d /tmp/expr-dsl
           rsync -a --delete --exclude .git /tmp/expr-dsl/ ./
