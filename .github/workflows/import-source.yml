@@ -23,8 +23,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh api repos/${{ github.repository }}/issues/${{ github.event.issue.number }} --jq .body \
-            | base64 --decode > /tmp/expr-dsl.zip
+          issue="${{ github.event.issue.number }}"
+          gh api "repos/${{ github.repository }}/issues/$issue" --jq -r .body > /tmp/payload.b64
+          gh api --paginate "repos/${{ github.repository }}/issues/$issue/comments?per_page=100" \
+            --jq '.[] | select(.body != "/import-expr-dsl") | .body' >> /tmp/payload.b64
+          tr -d '\r\n' < /tmp/payload.b64 | base64 --decode > /tmp/expr-dsl.zip
           mkdir /tmp/expr-dsl
           unzip -q /tmp/expr-dsl.zip -d /tmp/expr-dsl
           rsync -a --delete --exclude .git /tmp/expr-dsl/ ./
